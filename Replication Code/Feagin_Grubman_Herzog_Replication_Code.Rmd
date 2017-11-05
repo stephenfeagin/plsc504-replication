@@ -1,0 +1,1174 @@
+---
+title: "Replication Code for PLSC 504 Term Paper"
+author: "Stephen Feagin and Nate Grubman and Stephen Herzog"
+output: html_document
+---
+
+
+```{R, cache = TRUE}
+
+library("foreign")
+library("countrycode")
+library("csvread")
+library("fun")
+library("Hmisc")
+library("sandwich")
+library("lmtest")
+library("multiwayvcov")
+
+
+weeks <- read.dta("Data/WeeksAPSR2012.dta")
+hadteo <- read.dta("Data/Jte_autoregime5.dta")
+media <- read.csv("Data/Global_Media_Freedom_Data.csv")
+oil <- load("Data/Ross-Mahdavi\ Oil\ and\ Gas\ 1932-2014.RData")
+
+robust.se <- function(model, cluster){ #using Peter Aronow's function to calculate standard errors clustered by dyad. 
+  require(sandwich)
+  require(lmtest)
+  M <- length(unique(cluster))
+  N <- length(cluster)
+  K <- model$rank
+  dfc <- (M/(M - 1)) * ((N - 1)/(N - K))
+  uj <- apply(estfun(model), 2, function(x) tapply(x, cluster, sum))
+  rcse.cov <- dfc * sandwich(model, meat = crossprod(uj)/N)
+  rcse.se <- coeftest(model, rcse.cov)
+  return(list(rcse.cov, rcse.se))
+}
+
+#merge Hadenius and Teorell dataset with Weeks
+opposition <- merge(weeks, hadteo, by.x=c("ccode1", "year"), by.y=c("cowcode", "year"), all=TRUE)
+
+opp <- opposition[which(
+    is.na(opposition$mzinit) != 1 &
+    is.na(opposition$machinejlw_1) != 1 &
+    is.na(opposition$juntajlw_1) != 1 &
+    is.na(opposition$bossjlw_1) != 1 &
+    is.na(opposition$strongmanjlw_1) != 1 &
+    is.na(opposition$allotherauts_1) != 1 &
+    is.na(opposition$democracy_1) !=1 &
+    is.na(opposition$cap_1) != 1 &
+    is.na(opposition$cap_2) != 1 &
+    is.na(opposition$majmaj) != 1 &
+    is.na(opposition$minmaj) != 1 &
+    is.na(opposition$majmin) != 1 &
+    is.na(opposition$pcyrsmzinit) != 1 &
+    is.na(opposition$pcyrsmzinits1) != 1 &
+    is.na(opposition$pcyrsmzinits2) != 1 &
+    is.na(opposition$pcyrsmzinits3) != 1 &
+    is.na(opposition$dyadid) != 1 &
+    is.na(opposition$dirdyadid) != 1 & 
+    is.na(opposition$partsz) != 1 &
+    opposition$democracy_1 != "."), 
+  c("mzinit",
+    "machinejlw_1",
+    "juntajlw_1",
+    "bossjlw_1",
+    "strongmanjlw_1",
+    "allotherauts_1",
+    "newregime_1",
+    "democracy_1",
+    "democracy_2",
+    "cap_1",
+    "cap_2",
+    "initshare",
+    "dependlow",
+    "majmaj",
+    "minmaj",
+    "majmin",
+    "contigdum",
+    "logdist",
+    "s_wt_glo",
+    "s_lead_1",
+    "s_lead_2",
+    "pcyrsmzinit",
+    "pcyrsmzinits1",
+    "pcyrsmzinits2",
+    "pcyrsmzinits3",
+    "dirdyadid",
+    "dyadid",
+    "year",
+    "partsz",
+    "partsz1")]
+
+opp2 <- opposition[which(
+    is.na(opposition$mzinit) != 1 &
+    is.na(opposition$machinejlw_1) != 1 &
+    is.na(opposition$juntajlw_1) != 1 &
+    is.na(opposition$bossjlw_1) != 1 &
+    is.na(opposition$strongmanjlw_1) != 1 &
+    is.na(opposition$allotherauts_1) != 1 &
+    is.na(opposition$newregime_1) !=1 &
+    is.na(opposition$democracy_2) !=1 &
+    is.na(opposition$cap_1) != 1 &
+    is.na(opposition$cap_2) != 1 &
+    is.na(opposition$initshare) !=1 &
+    is.na(opposition$dependlow) !=1 &
+    is.na(opposition$majmaj) != 1 &
+    is.na(opposition$minmaj) != 1 &
+    is.na(opposition$majmin) != 1 &
+    is.na(opposition$contigdum) != 1 &
+    is.na(opposition$logdist) != 1 &
+    is.na(opposition$s_wt_glo) !=1 &
+    is.na(opposition$s_lead_1) !=1 &
+    is.na(opposition$s_lead_2) !=1 &
+    is.na(opposition$pcyrsmzinit) != 1 &
+    is.na(opposition$pcyrsmzinits1) != 1 &
+    is.na(opposition$pcyrsmzinits2) != 1 &
+    is.na(opposition$pcyrsmzinits3) != 1 &
+    is.na(opposition$dyadid) != 1 &
+    is.na(opposition$dirdyadid) != 1 & 
+    is.na(opposition$partsz) != 1 &
+    is.na(opposition$partsz1) !=1 &
+    opposition$democracy_1 != "."), 
+  c("mzinit",
+    "machinejlw_1",
+    "juntajlw_1",
+    "bossjlw_1",
+    "strongmanjlw_1",
+    "allotherauts_1",
+    "newregime_1",
+    "democracy_1",
+    "democracy_2",
+    "cap_1",
+    "cap_2",
+    "initshare",
+    "dependlow",
+    "majmaj",
+    "minmaj",
+    "majmin",
+    "contigdum",
+    "logdist",
+    "s_wt_glo",
+    "s_lead_1",
+    "s_lead_2",
+    "pcyrsmzinit",
+    "pcyrsmzinits1",
+    "pcyrsmzinits2",
+    "pcyrsmzinits3",
+    "dirdyadid",
+    "dyadid",
+    "year",
+    "partsz",
+    "partsz1")]
+
+```
+
+```{R, cache = TRUE}
+#Because the Hadenius and Teorell dataset does not cover the same set of years as that of Weeks, the following two regressions test her parsimonious and full models in the years covered by the Hadenius and Teorell dataset.
+reg1.1.1 <- glm(mzinit ~ machinejlw_1 +juntajlw_1 + bossjlw_1 + strongmanjlw_1 + allotherauts_1 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp, family="binomial")#this is the parismonious model. Note that data is drawn from the opp dataframe
+se1.1.1 <- robust.se(reg1.1.1, opp$dirdyadid)#standard errors of parsimonious model, clustered by dyad
+
+reg1.1.2 <- glm(mzinit ~ machinejlw_1 +juntajlw_1 + bossjlw_1 + strongmanjlw_1 + allotherauts_1 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2, family="binomial")#this is the full model. Note that data is drawn from the opp2 dataframe. 
+se1.1.2 <- robust.se(reg1.1.2, opp2$dirdyadid)#standard errors of parsimonious model, clustered by dyad
+```
+
+```{R, eval = FALSE}
+# In this section, we have created a loop that drops one country at a time from the Weeks dataset, runs the original regressions in her Table 1 and Table 2, and calculates the resulting p-values for each of the main variables with each iteration. This code chunk is set to "eval = FALSE" at this time, as this loop took several hours to complete.
+
+glm.drop.data <- data.frame(rep(0,165),0,0,0,0,0,0,0,0,0,0)
+colnames(glm.drop.data) <- c("country", "machine", "junta", "boss", "strongman", "other", "machine.se", "junta.se", "boss.se", "strongman.se", "other.se")
+glm.drop.data$country <- countrycode(unique(weeks.tab1$ccode1), origin = "cown", destination = "country.name")
+
+for(i in 1:length(unique(weeks.tab1$ccode1))){
+  glm.drop <- glm(formula = spec1,
+                  data = weeks.tab1[which(weeks.tab1$ccode1 != unique(weeks.tab1$ccode)[i]), ],
+                  family = "binomial")
+  glm.drop.data$machine[i] <- coef(glm.drop)["machinejlw_1"]
+  glm.drop.data$junta[i] <- coef(glm.drop)["juntajlw_1"]
+  glm.drop.data$boss[i] <- coef(glm.drop)["bossjlw_1"]
+  glm.drop.data$strongman[i] <- coef(glm.drop)["strongmanjlw_1"]
+  glm.drop.data$other[i] <- coef(glm.drop)["allotherauts_1"]
+  
+  se <- robust.se(model = glm.drop,
+                  cluster = weeks.tab1[which(weeks.tab1$ccode1 != unique(weeks.tab1$ccode)[i]), 
+                                       "dirdyadid" ])[[1]]
+  glm.drop.data$machine.se[i] <- sqrt(diag(se))["machinejlw_1"]
+  glm.drop.data$junta.se[i] <- sqrt(diag(se))["juntajlw_1"]
+  glm.drop.data$boss.se[i] <- sqrt(diag(se))["bossjlw_1"]
+  glm.drop.data$strongman.se[i] <- sqrt(diag(se))["strongmanjlw_1"]
+  glm.drop.data$other.se[i] <- sqrt(diag(se))["allotherauts_1"]
+  rm(glm.drop, se)
+}
+glm.drop.data$machine.p <- p.val(glm.drop.data$machine, glm.drop.data$machine.se)
+glm.drop.data$junta.p <- p.val(glm.drop.data$junta, glm.drop.data$junta.se)
+glm.drop.data$boss.p <- p.val(glm.drop.data$boss, glm.drop.data$boss.se)
+glm.drop.data$strongman.p <- p.val(glm.drop.data$strongman, glm.drop.data$strongman.se)
+glm.drop.data$other.p <- p.val(glm.drop.data$other, glm.drop.data$other.se)
+
+pdf("hist_drop_1.pdf")
+par(mfcol = c(2,2))
+hist(glm.drop.data$machine.p, breaks = 25, xlab = "p-value", main = "P-value for Machines")
+hist(glm.drop.data$junta.p, breaks = 25, xlab = "p-value", main = "P-value for Juntas")
+hist(glm.drop.data$boss.p, breaks = 25, xlab = "p-value", main = "P-value for Bosses")
+hist(glm.drop.data$strongman.p, breaks = 25, xlab = "p-value", main = "P-value for Strongmen")
+par(mfcol = c(1,1))
+dev.off()
+##############
+####### MODEL 2
+##############
+tab1.2.drop <- data.frame(rep(0,165),0,0,0,0,0,0,0,0,0,0)
+colnames(tab1.2.drop) <- c("country", "machine", "junta", "boss", "strongman", "other", "machine.se", "junta.se", "boss.se", "strongman.se", "other.se")
+tab1.2.drop$country <- countrycode(unique(weeks.tab1$ccode1), origin = "cown", destination = "country.name")
+
+for(i in 1:length(unique(weeks.tab1$ccode1))){
+  glm.drop <- glm(formula = spec1.2,
+                  data = weeks.tab1[which(weeks.tab1$ccode1 != unique(weeks.tab1$ccode)[i]), ],
+                  family = "binomial")
+  tab1.2.drop$machine[i] <- coef(glm.drop)["machinejlw_1"]
+  tab1.2.drop$junta[i] <- coef(glm.drop)["juntajlw_1"]
+  tab1.2.drop$boss[i] <- coef(glm.drop)["bossjlw_1"]
+  tab1.2.drop$strongman[i] <- coef(glm.drop)["strongmanjlw_1"]
+  tab1.2.drop$other[i] <- coef(glm.drop)["allotherauts_1"]
+  
+  se <- robust.se(model = glm.drop,
+                  cluster = weeks.tab1$dirdyadid[which(weeks.tab1$ccode1 != unique(weeks.tab1$ccode)[i])])[[1]]
+  tab1.2.drop$machine.se[i] <- sqrt(diag(se))["machinejlw_1"]
+  tab1.2.drop$junta.se[i] <- sqrt(diag(se))["juntajlw_1"]
+  tab1.2.drop$boss.se[i] <- sqrt(diag(se))["bossjlw_1"]
+  tab1.2.drop$strongman.se[i] <- sqrt(diag(se))["strongmanjlw_1"]
+  tab1.2.drop$other.se[i] <- sqrt(diag(se))["allotherauts_1"]
+  rm(glm.drop, se)
+}
+tab1.2.drop$machine.p <- p.val(tab1.2.drop$machine, tab1.2.drop$machine.se)
+tab1.2.drop$junta.p <- p.val(tab1.2.drop$junta, tab1.2.drop$junta.se)
+tab1.2.drop$boss.p <- p.val(tab1.2.drop$boss, tab1.2.drop$boss.se)
+tab1.2.drop$strongman.p <- p.val(tab1.2.drop$strongman, tab1.2.drop$strongman.se)
+tab1.2.drop$other.p <- p.val(tab1.2.drop$other, tab1.2.drop$other.se)
+save(tab1.2.drop, file = "tab1.2.drop.RData")
+
+pdf("hist_drop_2.pdf")
+par(mfcol = c(2,2))
+hist(tab1.2.drop$machine.p, breaks = 25, xlab = "p-value", main = "P-value for Machines")
+hist(tab1.2.drop$junta.p, breaks = 25, xlab = "p-value", main = "P-value for Juntas")
+hist(tab1.2.drop$strongman.p, breaks = 25, xlab = "p-value", main = "P-value for Strongmen")
+hist(tab1.2.drop$boss.p, breaks = 25, xlab = "p-value", main = "P-value for Bosses")
+par(mfcol = c(1,1))
+dev.off()
+
+#############
+
+### Model 2.1
+tab2.1.drop <- data.frame(rep(0, length(unique(weeks.tab2$ccode1))), 0, 0, 0, 0, 0, 0, 0, 0, 0)
+colnames(tab2.1.drop) <- c("country", "persrat", "milrat", "persXmil", "persrat.se", "milrat.se", "persXmil.se", "persrat.p", "milrat.p", "persXmil.p")
+tab2.1.drop$country <- countrycode(unique(weeks.tab2$ccode1), origin = "cown", destination = "country.name")
+for(i in 1:length(unique(weeks.tab2$ccode1))){
+  glm.drop <- glm(formula = spec.2.1,
+                  data = weeks.tab2[which(weeks.tab2$ccode1 != unique(weeks.tab2$ccode)[i]), ],
+                  family = binomial)
+  tab2.1.drop$persrat[i] <- coef(glm.drop)["persrat_1"]
+  tab2.1.drop$milrat[i] <- coef(glm.drop)["milrat_1"]
+  tab2.1.drop$persXmil[i] <- coef(glm.drop)["persXmil"]
+  
+  se <- robust.se(model = glm.drop,
+                  cluster = weeks.tab2$dirdyadid[which(weeks.tab2$ccode1 !=
+                                                         unique(weeks.tab2$ccode1)[i])])[[2]]
+  tab2.1.drop$persrat.se[i] <- se[2,2]
+  tab2.1.drop$milrat.se[i] <- se[3,2]
+  tab2.1.drop$persXmil.se[i] <- se[4,2]
+  tab2.1.drop$persrat.p[i] <- se[2,4]
+  tab2.1.drop$milrat.p[i] <- se[3,4]
+  tab2.1.drop$persXmil.p[i] <- se[4,4]
+}
+save(tab2.1.drop, file = "tab2.1.drop.RData")
+pdf("hist_drop_3.pdf")
+par(mfcol=c(1,2))
+hist(tab2.1.drop$persrat.p, xlab = "p-value", main = "P-values for Personalism Index")
+hist(tab2.1.drop$milrat.p, xlab = "p-value", main = "P-values for Militarism Index")
+par(mfcol=c(1,1))
+dev.off()
+hist(tab2.1.drop$persXmil.p)
+
+## Model 2.3
+
+tab2.3.drop <- data.frame(rep(0, length(unique(weeks.tab2$ccode1))), 0, 0, 0, 0, 0, 0, 0, 0, 0)
+colnames(tab2.3.drop) <- c("country", "milrat", "persrat", "persXmil", "milrat.se", "persrat.se", "persXmil.se", "milrat.p", "persrat.p", "persXmil.p")
+tab2.3.drop$country <- countrycode(unique(weeks.tab2$ccode1), origin = "cown", destination = "country.name")
+for(i in 1:length(unique(weeks.tab2$ccode1))){
+  glm.drop <- glm(formula = spec.2.3,
+                  data = weeks.tab2[which(weeks.tab2$ccode1 != unique(weeks.tab2$ccode)[i]), ],
+                  family = binomial)
+  tab2.3.drop$milrat[i] <- coef(glm.drop)["milrat_1"]
+  tab2.3.drop$persrat[i] <- coef(glm.drop)["persrat_1a"]
+  tab2.3.drop$persXmil[i] <- coef(glm.drop)["persXmila"]
+  
+  se <- robust.se(model = glm.drop,
+                  cluster = weeks.tab2$dirdyadid[which(weeks.tab2$ccode1 !=
+                                                         unique(weeks.tab2$ccode1)[i])])[[2]]
+  tab2.3.drop$milrat.se[i] <- se[2,2]
+  tab2.3.drop$persrat.se[i] <- se[3,2]
+  tab2.3.drop$persXmil.se[i] <- se[4,2]
+  tab2.3.drop$milrat.p[i] <- se[2,4]
+  tab2.3.drop$persrat.p[i] <- se[3,4]
+  tab2.3.drop$persXmil.p[i] <- se[4,4]
+}
+```
+
+```{R, eval = FALSE}
+# This section produced a full list of country-years, indicating regime type for each country in a given year. This was useful in looking at relative numbers of different regime types over time, as well as in helping us think about which cases are driving the results. This chunk is also labeled eval = FALSE due to the time demands of the loop
+
+# I need to get a country.year set, while Weeks is operating in dyad-year. 
+# There are 54 years, and 197 countries.
+cowcodes <- unique(weeks$ccode1)
+country.year <- as.data.frame(cbind( rep(cowcodes, 54), rep(unique(weeks$year), 197)))
+colnames(country.year) <- c("ccode", "year")
+# I add a column for full country name, to make it easier
+country.year$country <- countrycode(country.year$ccode, 
+                                    origin = "cown", 
+                                    destination = "country.name")
+# I then order the dataset by year
+country.year <- country.year[order(country.year$year), ]
+
+regime.type <- function(cow, year){
+  if(all(weeks$monarch_1[which(weeks$ccode1 == cow & weeks$year == year)]) == 1)
+    return("monarchy")
+  if(all(na.omit(weeks$democracy_1[which(weeks$ccode1 == cow & weeks$year == year)])) == 1)
+    return("democracy")
+  if(all(weeks$juntajlw_1[which(weeks$ccode1 == cow & weeks$year == year)]) == 1)
+    return("junta")
+  if(all(weeks$strongmanjlw_1[which(weeks$ccode1 == cow & weeks$year == year)]) == 1)
+    return("strongman")
+  if(all(weeks$machinejlw_1[which(weeks$ccode1 == cow & weeks$year == year)]) == 1)
+    return("machine")
+  if(all(weeks$bossjlw_1[which(weeks$ccode1 == cow & weeks$year == year)]) == 1)
+    return("boss")
+  if(all(weeks$otheraut_1[which(weeks$ccode1 == cow & weeks$year == year)]) == 1 )
+    return("other")
+}
+
+country.year$type <- mapply(FUN = regime.type, cow = country.year$ccode, year = country.year$year)
+
+monarchy <- subset(country.year, type == "monarchy")
+democracy <- subset(country.year, type == "democracy")
+junta <- subset(country.year, type == "junta")
+strongman <- subset(country.year, type == "strongman")
+machine <- subset(country.year, type == "machine")
+boss <- subset(country.year, type == "boss")
+other <- subset(country.year, type == "other")
+
+rtype.count <- data.frame(rep(0, length(unique(weeks$year))), 
+                          0, 0, 0, 0, 0, 0, 0)
+colnames(rtype.count) <- c("year", "monarchy", "democracy", "junta", "strongman", "machine", "boss", "other")
+rtype.count$year <- unique(weeks$year)
+rtype.count <- rtype.count[order(rtype.count$year), ]
+rtype.count$monarchy <- sapply(rtype.count$year, regime.count, regimetype = monarchy)
+rtype.count$democracy <- sapply(rtype.count$year, regime.count, regimetype = democracy)
+rtype.count$junta <- sapply(rtype.count$year, regime.count, regimetype = junta)
+rtype.count$strongman <- sapply(rtype.count$year, regime.count, regimetype = strongman)
+rtype.count$machine <- sapply(rtype.count$year, regime.count, regimetype = machine)
+rtype.count$boss <- sapply(rtype.count$year, regime.count, regimetype = boss)
+rtype.count$other <- sapply(rtype.count$year, regime.count, regimetype = other)
+```
+
+```{R, cache = TRUE}
+#In this section, we add party size as a covariate to Weeks's models. 
+#The first three regressions use her parsimonious model.
+#The first uses party size as it appears in the Hadenius and Teorell dataset. This includes legislatures in which the largest party holds all of the seats and legislatures in which the largest party holds none of the seats (presumably because parties are not allowed).
+reg2.1.1 <- glm(mzinit ~ partsz + machinejlw_1 +juntajlw_1 + bossjlw_1 + strongmanjlw_1 + allotherauts_1 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp, family="binomial")
+se2.1.1 <- robust.se(reg2.1.1, opp$dirdyadid)#calculates standard error
+
+#This regression drops those observations for which party size equals zero. 
+reg2.2.1 <- glm(mzinit ~ partsz + machinejlw_1 +juntajlw_1 + bossjlw_1 + strongmanjlw_1 + allotherauts_1 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$partsz > 0),], family="binomial")
+se2.2.1 <- robust.se(reg2.2.1, opp[which(opp$partsz > 0),]$dirdyadid)
+se2.2.1
+
+#This regression uses partsz1 instead of partsz. Partsz1 counts legislatures for which one party holds all the seats. By dropping those observations for which partsz1 equals zero, we are dropping both legislatures in which one party holds all of the seats and legislatures for which there are no parties. 
+reg2.3.1 <- glm(mzinit ~ partsz1 + machinejlw_1 +juntajlw_1 + bossjlw_1 + strongmanjlw_1 + allotherauts_1 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$partsz1 > 0),], family="binomial")
+se2.3.1 <- robust.se(reg2.3.1, opp[which(opp$partsz1 > 0),]$dirdyadid)
+
+#Here, we conduct similar regressions using the full model. The first does not drop any observations for which there is data. 
+reg2.1.2 <- glm(mzinit ~ partsz + machinejlw_1 +juntajlw_1 + bossjlw_1 + strongmanjlw_1 + allotherauts_1 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2, family="binomial")
+se2.1.2 <- robust.se(reg2.1.2, opp2$dirdyadid)
+se2.1.2
+
+#This regression drops party observations for which partsz equals zero. 
+reg2.2.2 <- glm(mzinit ~ partsz + machinejlw_1 +juntajlw_1 + bossjlw_1 + strongmanjlw_1 + allotherauts_1 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$partsz > 0),], family="binomial")
+se2.2.2 <- robust.se(reg2.2.2, opp2[which(opp2$partsz > 0),]$dirdyadid)
+
+#This regression drops party observations for which partsz1 equals zero. 
+reg2.3.2 <- glm(mzinit ~ partsz1 + machinejlw_1 +juntajlw_1 + bossjlw_1 + strongmanjlw_1 + allotherauts_1 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$partsz1 > 0),], family="binomial")
+se2.3.2 <- robust.se(reg2.3.2, opp2[which(opp2$partsz1 > 0),]$dirdyadid)
+se2.3.2
+```
+
+```{R, cache = TRUE}
+#In this section, we drop the regime type variables from Weeks's models to test the effect of partsz in the full universe of cases (authoritarian and democratic).
+#First, we use the parsimonious model.
+#We do not drop observations for which partsz equals zero. 
+reg3.1.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp, family="binomial")
+se3.1.1 <- robust.se(reg3.1.1, opp$dirdyadid)
+
+#Then, we drop observations for which partsz equals zero. 
+reg3.2.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$partsz > 0),], family="binomial")
+se3.2.1 <- robust.se(reg3.2.1, opp[which(opp$partsz > 0),]$dirdyadid)
+
+#Finally, we drop observations for which partsz1 equals zero. 
+reg3.3.1 <- glm(mzinit ~ partsz1 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$partsz1 > 0),], family="binomial")
+se3.3.1 <- robust.se(reg2.3.1, opp[which(opp$partsz1 > 0),]$dirdyadid)
+
+#Then, we analyze the full model. 
+#Again, we start by including partsz without dropping any observations for which partsz equals zero. 
+reg3.1.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2, family="binomial")
+se3.1.2 <- robust.se(reg3.1.2, opp2$dirdyadid)
+
+#Then, we drop observations for which partsz equals zero. 
+reg3.2.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$partsz > 0),], family="binomial")
+se3.2.2 <- robust.se(reg3.2.2, opp2[which(opp2$partsz > 0),]$dirdyadid)
+
+#Finally, we drop observations for which partsz1 equals zero. 
+reg3.3.2 <- glm(mzinit ~ partsz1 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$partsz1 > 0),], family="binomial")
+se3.3.2 <- robust.se(reg3.3.2, opp2[which(opp2$partsz1 > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#Now we analyze Weeks's models in the subset of cases for which regime type is democracy. 
+#First, we use the parsimonious model.
+#We do not drop observations for which partsz equals zero. 
+reg4.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$democracy_1 == 1 & opp$partsz > 0),], family="binomial")
+se4.1 <- robust.se(reg4.1, opp[which(opp$democracy_1 == 1 & opp$partsz > 0),]$dirdyadid)
+
+#Then, we drop observations for which partsz equals zero. 
+reg4.2 <- glm(mzinit ~ partsz + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$democracy_1 == 1 & opp2$partsz > 0),], family="binomial")
+se4.1 <- robust.se(reg4.2, opp2[which(opp2$democracy_1 == 1 & opp2$partsz > 0),]$dirdyadid)
+
+#Finally, we drop observations for which partsz1 equals zero. 
+reg4.3 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$democracy_1 == 1 & opp$partsz > 0),], family="binomial")
+se4.3 <- robust.se(reg4.3, opp[which(opp$democracy_1 == 1 & opp$partsz > 0),]$dirdyadid)
+
+#Then, we analyze the full model. 
+#We drop observations for which partsz equals zero.  
+reg4.4 <- glm(mzinit ~ partsz + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$democracy_1 == 1 & opp2$partsz > 0),], family="binomial")
+se4.4 <- robust.se(reg4.4, opp2[which(opp2$democracy_1 == 1 & opp2$partsz > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#Then, we analyzed the subset of cases for which regime type is not democratic
+#We started with the parsimonious model.
+#This regression does not drop any observations based on the value of partsz. 
+reg5.1.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$democracy_1 == 0),], family="binomial")
+se5.1.1 <- robust.se(reg5.1.1, opp[which(opp$democracy_1 == 0),]$dirdyadid)
+
+#This regression drops those observations for which partsz equals zero. 
+reg5.2.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$democracy_1 == 0 & opp$partsz > 0),], family="binomial")
+se5.2.1 <- robust.se(reg5.2.1, opp[which(opp$democracy_1 == 0 & opp$partsz > 0),]$dirdyadid)
+
+#This regression drops those for which partsz1 equals zero. 
+reg5.3.1 <- glm(mzinit ~ partsz1 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$democracy_1 == 0 & opp$partsz1 > 0),], family="binomial")
+se5.3.1 <- robust.se(reg5.3.1, opp[which(opp$democracy_1 == 0 & opp$partsz1 > 0),]$dirdyadid)
+
+#Then, we analyzed the full model.
+#This regression does not drop any observations based on the value of partsz. 
+reg5.1.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$democracy_1 == 0),], family="binomial")
+se5.1.2 <- robust.se(reg5.1.2, opp2[which(opp2$democracy_1 == 0),]$dirdyadid)
+
+#This regression drops those observations for which partsz equals zero. 
+reg5.2.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$democracy_1 == 0 & opp2$partsz > 0),], family="binomial")
+se5.2.2 <- robust.se(reg5.2.2, opp2[which(opp2$democracy_1 == 0 & opp2$partsz > 0),]$dirdyadid)
+
+#This regression drops those for which partsz1 equals zero. 
+reg5.3.2 <- glm(mzinit ~ partsz1 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$democracy_1 == 0 & opp2$partsz1 > 0),], family="binomial")
+se5.3.2 <- robust.se(reg5.3.2, opp2[which(opp2$democracy_1 == 0 & opp2$partsz1 > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#Now we look only at machines.
+#All observations, regardless of partsz. 
+reg6.1.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$machinejlw_1 == 1),], family="binomial")
+se6.1.1 <- robust.se(reg6.1.1, opp[which(opp$machinejlw_1 == 1),]$dirdyadid)
+
+#drop observations for which partsz equals zero
+reg6.2.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$machinejlw_1 == 1 & opp$partsz > 0),], family="binomial")
+se6.2.1 <- robust.se(reg6.2.1, opp[which(opp$machinejlw_1 == 1 & opp$partsz > 0),]$dirdyadid)
+
+#drop observations for which partsz1 equals zero
+reg6.3.1 <- glm(mzinit ~ partsz1 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$machinejlw_1 == 1 & opp$partsz1 > 0),], family="binomial")
+se6.3.1 <- robust.se(reg6.3.1, opp[which(opp$machinejlw_1 == 1 & opp$partsz1 > 0),]$dirdyadid)
+
+#full model
+#All observations, regardless of partsz. 
+reg6.1.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$machinejlw_1 == 1),], family="binomial")
+se6.1.2 <- robust.se(reg6.1.2, opp2[which(opp2$machinejlw_1 == 1),]$dirdyadid)
+
+#drop observations for which partsz equals zero
+reg6.2.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$machinejlw_1 == 1 & opp2$partsz > 0),], family="binomial")
+se6.2.2 <- robust.se(reg6.2.2, opp2[which(opp2$machinejlw_1 == 1 & opp2$partsz > 0),]$dirdyadid)
+
+#drop observations for which partsz1 equals zero
+reg6.3.2 <- glm(mzinit ~ partsz1 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$machinejlw_1 == 1 & opp2$partsz1 > 0),], family="binomial")
+se6.3.2 <- robust.se(reg6.3.2, opp2[which(opp2$machinejlw_1 == 1 & opp2$partsz1 > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#look at juntas
+#All observations, regardless of partsz. 
+reg7.1.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$juntajlw_1 == 1),], family="binomial")
+se7.1.1 <- robust.se(reg7.1.1, opp[which(opp$juntajlw_1 == 1),]$dirdyadid)
+
+#drop observations for which partsz equals zero
+reg7.2.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$juntajlw_1 == 1 & opp$partsz > 0),], family="binomial")
+se7.2.1 <- robust.se(reg7.2.1, opp[which(opp$juntajlw_1 == 1 & opp$partsz > 0),]$dirdyadid)
+
+#drop observations for which partsz1 equals zero
+reg7.3.1 <- glm(mzinit ~ partsz1 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$juntajlw_1 == 1 & opp$partsz1 > 0),], family="binomial")
+se7.3.1 <- robust.se(reg7.3.1, opp[which(opp$juntajlw_1 == 1 & opp$partsz1 > 0),]$dirdyadid)
+
+#full model
+#All observations, regardless of partsz. 
+reg8.1.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$juntajlw_1 == 1),], family="binomial")
+se8.1.2 <- robust.se(reg8.1.2, opp[which(opp2$juntajlw_1 == 1),]$dirdyadid)
+
+#drop observations for which partsz equals zero
+reg8.2.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$juntajlw_1 == 1 & opp2$partsz > 0),], family="binomial")
+se8.2.2 <- robust.se(reg8.2.2, opp[which(opp2$juntajlw_1 == 1 & opp2$partsz > 0),]$dirdyadid)
+
+#drop observations for which partsz1 equals zero
+reg8.3.2 <- glm(mzinit ~ partsz1 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$juntajlw_1 == 1 & opp2$partsz1 > 0),], family="binomial")
+se8.3.2 <- robust.se(reg8.3.2, opp[which(opp2$juntajlw_1 == 1 & opp2$partsz1 > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#combining machines and juntas
+#parsimonious model
+#All observations, regardless of partsz. 
+reg9.1.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$juntajlw_1 == 1 | opp$machinejlw_1 == 1),], family="binomial")
+se9.1.1 <- robust.se(reg9.1.1, opp[which(opp$juntajlw_1 == 1 | opp$machinejlw_1 == 1),"dirdyadid"])
+
+#drop observations for which partsz equals zero
+reg9.2.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$juntajlw_1 == 1 | opp$machinejlw_1 == 1 & opp$partsz > 0),], family="binomial")
+se9.2.1 <- robust.se(reg9.2.1, opp[which(opp$juntajlw_1 == 1 | opp$machinejlw_1 == 1 & opp$partsz > 0),"dirdyadid"])
+
+#drop observations for which partsz1 equals zero
+reg9.3.1 <- glm(mzinit ~ partsz1 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$juntajlw_1 == 1 | opp$machinejlw_1 == 1 & opp$partsz1 > 0),], family="binomial")
+se9.3.1 <- robust.se(reg9.3.1, opp[which(opp$juntajlw_1 == 1 | opp$machinejlw_1 == 1 & opp$partsz1 > 0),"dirdyadid"])
+
+#full model
+#All observations, regardless of partsz. 
+reg9.1.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$juntajlw_1 == 1 | opp2$machinejlw_1 == 1),], family="binomial")
+se9.1.2 <- robust.se(reg9.1.2, opp2[which(opp2$juntajlw_1 == 1 | opp2$machinejlw_1 == 1),"dirdyadid"])
+
+#drop observations for which partsz equals zero
+reg9.2.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$juntajlw_1 == 1 | opp2$machinejlw_1 == 1 & opp2$partsz > 0),], family="binomial")
+se9.2.2 <- robust.se(reg9.2.2, opp2[which(opp2$juntajlw_1 == 1 | opp2$machinejlw_1 == 1 & opp2$partsz > 0),"dirdyadid"])
+
+#drop observations for which partsz1 equals zero
+reg9.3.2 <- glm(mzinit ~ partsz1 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$juntajlw_1 == 1 | opp2$machinejlw_1 == 1 & opp2$partsz1 > 0),], family="binomial")
+se9.3.2 <- robust.se(reg9.3.2, opp2[which(opp2$juntajlw_1 == 1 | opp2$machinejlw_1 == 1 & opp2$partsz1 > 0),"dirdyadid"])
+```
+
+```{R, cache = TRUE}
+#Looking only at strongmen
+#All observations, regardless of partsz. 
+reg10.1.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$strongmanjlw_1 == 1),], family="binomial")
+se10.1.1 <- robust.se(reg10.1.1, opp[which(opp$strongmanjlw_1 == 1),]$dirdyadid)
+
+#drop observations for which partsz equals zero
+reg10.2.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$strongmanjlw_1 == 1 & opp$partsz > 0),], family="binomial")
+se10.2.1 <- robust.se(reg10.2.1, opp[which(opp$strongmanjlw_1 == 1 & opp$partsz > 0),]$dirdyadid)
+
+#drop observations for which partsz1 equals zero
+reg10.3.1 <- glm(mzinit ~ partsz1 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$strongmanjlw_1 == 1 & opp$partsz1 > 0),], family="binomial")
+se10.3.1 <- robust.se(reg10.3.1, opp[which(opp$strongmanjlw_1 == 1 & opp$partsz1 > 0),]$dirdyadid)
+
+#Full model
+#All observations, regardless of partsz. 
+reg10.1.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$strongmanjlw_1 == 1),], family="binomial")
+se10.1.2 <- robust.se(reg10.1.2, opp2[which(opp2$strongmanjlw_1 == 1),]$dirdyadid)
+
+#drop observations for which partsz equals zero
+reg10.2.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$strongmanjlw_1 == 1 & opp2$partsz > 0),], family="binomial")
+se10.2.2 <- robust.se(reg10.2.2, opp2[which(opp2$strongmanjlw_1 == 1 & opp2$partsz > 0),]$dirdyadid)
+
+#drop observations for which partsz1 equals zero
+reg10.3.2 <- glm(mzinit ~ partsz1 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$strongmanjlw_1 == 1 & opp2$partsz1 > 0),], family="binomial")
+se10.3.2 <- robust.se(reg10.3.2, opp2[which(opp2$strongmanjlw_1 == 1 & opp2$partsz1 > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#bosses
+#All observations, regardless of partsz. 
+reg11.1.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$bossjlw_1 == 1),], family="binomial")
+se11.1.1 <- robust.se(reg11.1.1, opp[which(opp$bossjlw_1 == 1),]$dirdyadid)
+
+#drop observations for which partsz equals zero
+reg11.2.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$bossjlw_1 == 1 & opp$partsz > 0),], family="binomial")
+se11.2.1 <- robust.se(reg11.2.1, opp[which(opp$bossjlw_1 == 1 & opp$partsz > 0),]$dirdyadid)
+
+#drop observations for which partsz1 equals zero
+reg11.3.1 <- glm(mzinit ~ partsz1 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$bossjlw_1 == 1 & opp$partsz1 > 0),], family="binomial")
+se11.3.1 <- robust.se(reg11.3.1, opp[which(opp$bossjlw_1 == 1 & opp$partsz1 > 0),]$dirdyadid)
+
+#full model
+#All observations, regardless of partsz. 
+reg11.1.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$bossjlw_1 == 1),], family="binomial")
+se11.1.2 <- robust.se(reg11.1.2, opp2[which(opp2$bossjlw_1 == 1),]$dirdyadid)
+
+#drop observations for which partsz equals zero
+reg11.2.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$bossjlw_1 == 1 & opp2$partsz > 0),], family="binomial")
+se11.2.2<- robust.se(reg11.2.2, opp2[which(opp2$bossjlw_1 == 1 & opp2$partsz > 0),]$dirdyadid)
+
+#drop observations for which partsz1 equals zero
+reg11.3.2 <- glm(mzinit ~ partsz1 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$bossjlw_1 == 1 & opp2$partsz1 > 0),], family="binomial")
+se11.3.2 <- robust.se(reg11.3.2, opp2[which(opp2$bossjlw_1 == 1 & opp2$partsz1 > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#In this section we look only those regimes that are coded as strongmen or bosses 
+#All observations, regardless of partsz. 
+reg12.1.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$bossjlw_1 == 1 | opp$strongmanjlw_1 == 1),], family="binomial")
+se12.1.1 <- robust.se(reg12.1.1, opp[which(opp$bossjlw_1 == 1 | opp$strongmanjlw_1 == 1),]$dirdyadid)
+
+#drop observations for which partsz equals zero
+reg12.2.1 <- glm(mzinit ~ partsz + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$bossjlw_1 == 1 | opp$strongmanjlw_1 == 1 & opp$partsz > 0),], family="binomial")
+se12.2.1 <- robust.se(reg12.2.1, opp[which(opp$bossjlw_1 == 1 | opp$strongmanjlw_1 == 1 & opp$partsz > 0),]$dirdyadid)
+
+#drop observations for which partsz1 equals zero
+reg12.3.1 <- glm(mzinit ~ partsz1 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp[which(opp$bossjlw_1 == 1 | opp$strongmanjlw_1 == 1 & opp$partsz1 > 0),], family="binomial")
+se12.3.1 <- robust.se(reg12.3.1, opp[which(opp$bossjlw_1 == 1 | opp$strongmanjlw_1 == 1 & opp$partsz1 > 0),]$dirdyadid)
+
+#full model
+#All observations, regardlesss of partsz. 
+reg12.1.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$bossjlw_1 == 1 | opp2$strongmanjlw_1 == 1),], family="binomial")
+se12.1.2 <- robust.se(reg12.1.2, opp2[which(opp2$bossjlw_1 == 1 | opp2$strongmanjlw_1 == 1),]$dirdyadid)
+
+#drop observations for which partsz equals zero
+reg12.2.2 <- glm(mzinit ~ partsz + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$bossjlw_1 == 1 | opp2$strongmanjlw_1 == 1 & opp2$partsz > 0),], family="binomial")
+se12.2.2 <- robust.se(reg12.2.2, opp2[which(opp2$bossjlw_1 == 1 | opp2$strongmanjlw_1 == 1 & opp2$partsz > 0),]$dirdyadid)
+
+#drop observations for which partsz1 equals zero
+reg12.3.2 <- glm(mzinit ~ partsz1 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=opp2[which(opp2$bossjlw_1 == 1 | opp2$strongmanjlw_1 == 1 & opp2$partsz1 > 0),], family="binomial")
+se12.3.2 <- robust.se(reg12.3.2, opp2[which(opp2$bossjlw_1 == 1 | opp2$strongmanjlw_1 == 1 & opp2$partsz1 > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#In this section we analyze the effect of media freedom. 
+#First, we merge the media freedom dataset with that of Weeks
+med <- merge(weeks, media, by.x=c("ccode1", "year"), by.y=c("ccode", "year"), all=TRUE)
+
+#Then, we create a dataframe dropping the observations for which one of the variables used in the parsimonious model is missing. 
+mednoNA <- med[which(
+    is.na(med$mzinit) != 1 &
+    is.na(med$machinejlw_1) != 1 &
+    is.na(med$juntajlw_1) != 1 &
+    is.na(med$bossjlw_1) != 1 &
+    is.na(med$strongmanjlw_1) != 1 &
+    is.na(med$allotherauts_1) != 1 &
+    is.na(med$democracy_1) !=1 &
+    is.na(med$cap_1) != 1 &
+    is.na(med$cap_2) != 1 &
+    is.na(med$majmaj) != 1 &
+    is.na(med$minmaj) != 1 &
+    is.na(med$majmin) != 1 &
+    is.na(med$pcyrsmzinit) != 1 &
+    is.na(med$pcyrsmzinits1) != 1 &
+    is.na(med$pcyrsmzinits2) != 1 &
+    is.na(med$pcyrsmzinits3) != 1 &
+    is.na(med$dyadid) != 1 &
+    is.na(med$dirdyadid) != 1 & 
+    is.na(med$mediascore) !=1 &
+    med$democracy_1 != "."), 
+  c("mzinit",
+    "machinejlw_1",
+    "juntajlw_1",
+    "bossjlw_1",
+    "strongmanjlw_1",
+    "allotherauts_1",
+    "newregime_1",
+    "democracy_1",
+    "democracy_2",
+    "cap_1",
+    "cap_2",
+    "initshare",
+    "dependlow",
+    "majmaj",
+    "minmaj",
+    "majmin",
+    "contigdum",
+    "logdist",
+    "s_wt_glo",
+    "s_lead_1",
+    "s_lead_2",
+    "pcyrsmzinit",
+    "pcyrsmzinits1",
+    "pcyrsmzinits2",
+    "pcyrsmzinits3",
+    "dirdyadid",
+    "dyadid",
+    "year",
+    "mediascore")]
+
+#Then, we create a dataframe to be used for the full model. 
+mednoNA2 <- med[which(
+    is.na(med$mzinit) != 1 &
+    is.na(med$machinejlw_1) != 1 &
+    is.na(med$juntajlw_1) != 1 &
+    is.na(med$bossjlw_1) != 1 &
+    is.na(med$strongmanjlw_1) != 1 &
+    is.na(med$allotherauts_1) != 1 &
+    is.na(med$newregime_1) !=1 &
+    is.na(med$democracy_2) !=1 &
+    is.na(med$cap_1) != 1 &
+    is.na(med$cap_2) != 1 &
+    is.na(med$initshare) !=1 &
+    is.na(med$dependlow) !=1 &
+    is.na(med$majmaj) != 1 &
+    is.na(med$minmaj) != 1 &
+    is.na(med$majmin) != 1 &
+    is.na(med$contigdum) != 1 &
+    is.na(med$logdist) != 1 &
+    is.na(med$s_wt_glo) !=1 &
+    is.na(med$s_lead_1) !=1 &
+    is.na(med$s_lead_2) !=1 &
+    is.na(med$pcyrsmzinit) != 1 &
+    is.na(med$pcyrsmzinits1) != 1 &
+    is.na(med$pcyrsmzinits2) != 1 &
+    is.na(med$pcyrsmzinits3) != 1 &
+    is.na(med$dyadid) != 1 &
+    is.na(med$dirdyadid) != 1 & 
+    is.na(med$mediascore) !=1 &
+    med$democracy_1 != "."), 
+  c("mzinit",
+    "machinejlw_1",
+    "juntajlw_1",
+    "bossjlw_1",
+    "strongmanjlw_1",
+    "allotherauts_1",
+    "newregime_1",
+    "democracy_1",
+    "democracy_2",
+    "cap_1",
+    "cap_2",
+    "initshare",
+    "dependlow",
+    "majmaj",
+    "minmaj",
+    "majmin",
+    "contigdum",
+    "logdist",
+    "s_wt_glo",
+    "s_lead_1",
+    "s_lead_2",
+    "pcyrsmzinit",
+    "pcyrsmzinits1",
+    "pcyrsmzinits2",
+    "pcyrsmzinits3",
+    "dirdyadid",
+    "dyadid",
+    "year",
+    "mediascore")]
+```
+
+```{R, cache = TRUE}
+#First we analyze the parsimonious model, dropping the regime-type variables and instead using mediascore as the explanatory variable in the full universe of cases (democracies and nondemocracies)
+#Note: We drop all values for which mediascore equals zero (these countries have no national media) and for which mediascore equals eight (these are missing values)
+reg13.1 <- glm(mzinit ~ mediascore + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA[which(mednoNA$democracy_1!="." & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),], family="binomial")
+se13.1 <- robust.se(reg13.1, mednoNA[which(mednoNA$democracy_1!="." & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),]$dirdyadid)
+
+#Then, we use the full model, once again dropping all observations for which mediascore equals 0 or 8. 
+reg13.2 <- glm(mzinit ~ mediascore + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA2[which(mednoNA2$democracy_1!="." & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),], family="binomial")
+se13.2 <- robust.se(reg13.2, mednoNA2[which(mednoNA2$democracy_1!="." & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),]$dirdyadid)
+
+#Then, we analyze her parsimonious model with mediascore as a covariate.
+reg14.1 <- glm(mzinit ~ machinejlw_1 +juntajlw_1 + bossjlw_1 + strongmanjlw_1 + allotherauts_1 + mediascore + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA[which(mednoNA$democracy_1!="." & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),], family="binomial")
+se14.1 <- robust.se(reg14.1, mednoNA[which(mednoNA$democracy_1!="." & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),]$dirdyadid)
+
+#We do the same for the full model.
+reg14.2 <- glm(mzinit ~ machinejlw_1 +juntajlw_1 + bossjlw_1 + strongmanjlw_1 + allotherauts_1 + mediascore + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA2[which(mednoNA2$democracy_1!="." & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),], family="binomial")
+se14.2 <- robust.se(reg14.2, mednoNA2[which(mednoNA2$democracy_1!="." & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#We begin subgroup analysis by looking only at democracies. 
+#We use mediascore as the explanatory variable (dropping mediascore equals 0 or 8) in the parsimonious model. 
+reg15.1 <- glm(mzinit ~ mediascore + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA[which(mednoNA$democracy_1 == 1 & mednoNA$mediascore < 8),], family="binomial")
+se15.1 <- robust.se(reg15.1, mednoNA[which(mednoNA$democracy_1 == 1 & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),]$dirdyadid)
+
+#Then, we do the same for the full model. 
+reg15.2 <- glm(mzinit ~ mediascore + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA2[which(mednoNA2$democracy_1 == 1 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),], family="binomial")
+se15.2 <- robust.se(reg15.2, mednoNA2[which(mednoNA2$democracy_1 == 1 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#Then, we look at autocracies
+#We use mediascore in the parsimonious model
+reg16.1 <- glm(mzinit ~ mediascore + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA[which(mednoNA$democracy_1 == 0 & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),], family="binomial")
+se16.1 <- robust.se(reg16.1, mednoNA[which(mednoNA$democracy_1 == 0 & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),]$dirdyadid)
+
+#Then, we look at the full model. 
+reg16.2 <- glm(mzinit ~ mediascore + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA2[which(mednoNA2$democracy_1 == 0 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),], family="binomial")
+se16.2 <- robust.se(reg16.2, mednoNA2[which(mednoNA2$democracy_1 == 0 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#Then, we look at machines. 
+#parsimonious model
+reg17.1 <- glm(mzinit ~ mediascore + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA[which(mednoNA$machinejlw_1 == 1 & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),], family="binomial")
+se17.1 <- robust.se(reg17.1, mednoNA[which(mednoNA$machinejlw_1 == 1 & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),]$dirdyadid)
+
+#full model
+reg17.2 <- glm(mzinit ~ mediascore + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA2[which(mednoNA2$machinejlw_1 == 1 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),], family="binomial")
+se17.2 <- robust.se(reg17.2, mednoNA2[which(mednoNA2$machinejlw_1 == 1 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#Next, we look at juntas
+#Again, we start by using mediascore as the explanatory variable (dropping all observations for which mediascore equals zero or eight) in the parsimonious model. 
+reg18.1 <- glm(mzinit ~ mediascore + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=med[which(med$juntajlw_1 == 1 & med$mediascore < 8),], family="binomial")
+se18.1 <- robust.se(reg18.1, mednoNA[which(mednoNA$juntajlw_1 == 1 & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),]$dirdyadid)
+
+#We do the same for the full model. 
+reg18.2 <- glm(mzinit ~ mediascore + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA2[which(mednoNA2$juntajlw_1 == 1 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),], family="binomial")
+se18.2 <- robust.se(reg18.2, mednoNA2[which(mednoNA2$juntajlw_1 == 1 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#Now, we look at strongmen
+#We use mediascore as the explanatory variable, dropping mediascore = 0 or 8 in the parsimonious model
+reg19.1 <- glm(mzinit ~ mediascore + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA[which(mednoNA$strongmanjlw_1 == 1 & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),], family="binomial")
+se19.1 <- robust.se(reg19.1, mednoNA[which(mednoNA$strongmanjlw_1 == 1 & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),]$dirdyadid)
+
+#Now, the full model. 
+reg19.2 <- glm(mzinit ~ mediascore + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA2[which(mednoNA2$strongmanjlw_1 == 1 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),], family="binomial")
+se19.2 <- robust.se(reg19.2, mednoNA2[which(mednoNA2$strongmanjlw_1 == 1 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#Now, we look at the bosses
+#We start by using mediascore as an explanatory variable in the parsimonious model. 
+reg20.1 <- glm(mzinit ~ mediascore + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA[which(mednoNA$bossjlw_1 == 1 & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),], family="binomial")
+se20.1 <- robust.se(reg20.1, mednoNA[which(mednoNA$bossjlw_1 == 1 & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),]$dirdyadid)
+
+#Then, we put it in the full model. 
+reg20.2 <- glm(mzinit ~ mediascore + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA2[which(mednoNA2$bossjlw_1 == 1 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),], family="binomial")
+se20.2 <- robust.se(reg20.2, mednoNA2[which(mednoNA2$bossjlw_1 == 1 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#combine bosses and strongmen
+#parsimonious model
+reg21.1 <- glm(mzinit ~ mediascore + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA[which(mednoNA$bossjlw_1 == 1 | mednoNA$strongmanjlw_1 == 1 & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),], family="binomial")
+se21.1 <- robust.se(reg21.1, mednoNA[which(mednoNA$bossjlw_1 == 1 | mednoNA$strongmanjlw_1 == 1 & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),]$dirdyadid)
+
+#full model
+reg21.2 <- glm(mzinit ~ mediascore + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA2[which(mednoNA2$bossjlw_1 == 1 | mednoNA2$strongmanjlw_1 == 1 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),], family="binomial")
+se21.2 <- robust.se(reg21.2, mednoNA2[which(mednoNA2$bossjlw_1 == 1 | mednoNA2$strongmanjlw_1 == 1 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#Next we analyze that set of all observations that are either juntas or machines. 
+#parsimonious model
+reg22.1 <- glm(mzinit ~ mediascore + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA[which(mednoNA$juntajlw_1 == 1 | mednoNA$machinejlw_1 == 1 & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),], family="binomial")
+se22.1 <- robust.se(reg22.1, mednoNA[which(mednoNA$juntajlw_1 == 1 | mednoNA$machinejlw_1 == 1 & mednoNA$mediascore < 8 & mednoNA$mediascore > 0),]$dirdyadid)
+
+#full model
+reg22.2 <- glm(mzinit ~ mediascore + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=mednoNA2[which(mednoNA2$juntajlw_1 == 1 | mednoNA2$machinejlw_1 == 1 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),], family="binomial")
+se22.2 <- robust.se(reg22.2, mednoNA2[which(mednoNA2$juntajlw_1 == 1 | mednoNA2$machinejlw_1 == 1 & mednoNA2$mediascore < 8 & mednoNA2$mediascore > 0),]$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#In this section, we used data on oil and natural gas wealth to analyze the propensity to adopt certain regimes and to have a free media. 
+#Here we change the country coding in the Ross and Mahdavi dataset from iso3n to cow. This allows for easier merging with the weeks dataset. 
+ccodeoil <- countrycode(x$iso3numeric, "iso3n", "cown", warn = FALSE)
+
+#We title the dataset oil
+oil <- cbind(ccodeoil, x)
+
+#Then merge it with that of weeks to form a dataset called propensity
+propensity <- merge(weeks, oil, by.x=c("ccode1", "year"), by.y=c("ccodeoil", "year"))
+
+#We then form a dataframe that drops all observations for which there is a missing value for one of the variables used in the parsimonious model. 
+prop <- propensity[which(
+    is.na(propensity$mzinit) != 1 &
+    is.na(propensity$machinejlw_1) != 1 &
+    is.na(propensity$juntajlw_1) != 1 &
+    is.na(propensity$bossjlw_1) != 1 &
+    is.na(propensity$strongmanjlw_1) != 1 &
+    is.na(propensity$allotherauts_1) != 1 &
+    is.na(propensity$democracy_1) !=1 &
+    is.na(propensity$cap_1) != 1 &
+    is.na(propensity$cap_2) != 1 &
+    is.na(propensity$majmaj) != 1 &
+    is.na(propensity$minmaj) != 1 &
+    is.na(propensity$majmin) != 1 &
+    is.na(propensity$pcyrsmzinit) != 1 &
+    is.na(propensity$pcyrsmzinits1) != 1 &
+    is.na(propensity$pcyrsmzinits2) != 1 &
+    is.na(propensity$pcyrsmzinits3) != 1 &
+    is.na(propensity$dyadid) != 1 &
+    is.na(propensity$dirdyadid) != 1 & 
+    is.na(propensity$oil_gas_valuePOP_2014) != 1 &
+    propensity$democracy_1 != "."), 
+  c("mzinit",
+    "machinejlw_1",
+    "juntajlw_1",
+    "bossjlw_1",
+    "strongmanjlw_1",
+    "allotherauts_1",
+    "newregime_1",
+    "democracy_1",
+    "democracy_2",
+    "cap_1",
+    "cap_2",
+    "initshare",
+    "dependlow",
+    "majmaj",
+    "minmaj",
+    "majmin",
+    "contigdum",
+    "logdist",
+    "s_wt_glo",
+    "s_lead_1",
+    "s_lead_2",
+    "pcyrsmzinit",
+    "pcyrsmzinits1",
+    "pcyrsmzinits2",
+    "pcyrsmzinits3",
+    "dirdyadid",
+    "dyadid",
+    "year",
+    "oil_gas_valuePOP_2014")]
+
+#We then do the same for the full model. 
+prop2 <- propensity[which(
+    is.na(propensity$mzinit) != 1 &
+    is.na(propensity$machinejlw_1) != 1 &
+    is.na(propensity$juntajlw_1) != 1 &
+    is.na(propensity$bossjlw_1) != 1 &
+    is.na(propensity$strongmanjlw_1) != 1 &
+    is.na(propensity$allotherauts_1) != 1 &
+    is.na(propensity$newregime_1) !=1 &
+    is.na(propensity$democracy_2) !=1 &
+    is.na(propensity$cap_1) != 1 &
+    is.na(propensity$cap_2) != 1 &
+    is.na(propensity$initshare) !=1 &
+    is.na(propensity$dependlow) !=1 &
+    is.na(propensity$majmaj) != 1 &
+    is.na(propensity$minmaj) != 1 &
+    is.na(propensity$majmin) != 1 &
+    is.na(propensity$contigdum) != 1 &
+    is.na(propensity$logdist) != 1 &
+    is.na(propensity$s_wt_glo) !=1 &
+    is.na(propensity$s_lead_1) !=1 &
+    is.na(propensity$s_lead_2) !=1 &
+    is.na(propensity$pcyrsmzinit) != 1 &
+    is.na(propensity$pcyrsmzinits1) != 1 &
+    is.na(propensity$pcyrsmzinits2) != 1 &
+    is.na(propensity$pcyrsmzinits3) != 1 &
+    is.na(propensity$dyadid) != 1 &
+    is.na(propensity$dirdyadid) != 1 & 
+    is.na(propensity$oil_gas_valuePOP_2014) != 1 &
+    propensity$democracy_1 != "."), 
+  c("mzinit",
+    "machinejlw_1",
+    "juntajlw_1",
+    "bossjlw_1",
+    "strongmanjlw_1",
+    "allotherauts_1",
+    "newregime_1",
+    "democracy_1",
+    "democracy_2",
+    "cap_1",
+    "cap_2",
+    "initshare",
+    "dependlow",
+    "majmaj",
+    "minmaj",
+    "majmin",
+    "contigdum",
+    "logdist",
+    "s_wt_glo",
+    "s_lead_1",
+    "s_lead_2",
+    "pcyrsmzinit",
+    "pcyrsmzinits1",
+    "pcyrsmzinits2",
+    "pcyrsmzinits3",
+    "dirdyadid",
+    "dyadid",
+    "year",
+    "oil_gas_valuePOP_2014")]
+```
+
+```{R, cache = TRUE}
+#Here we calculate the propensity of being a machine conditional upon oil and gas value per capita (2014 dollar values) and the covariates used in Weeks's parsimonious model.  
+pscore1.1 <- glm(machinejlw_1 ~ oil_gas_valuePOP_2014 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=prop[which(prop$democracy_1 == 0),], family="binomial")
+sepscore1.1 <- robust.se(pscore1.1, prop[which(prop$democracy_1 == 0),]$dirdyadid)
+
+#We then do the same in her full model. 
+pscore1.2 <- glm(machinejlw_1 ~ oil_gas_valuePOP_2014 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=prop2[which(prop2$democracy_1 == 0),], family="binomial")
+sepscore1.2 <- robust.se(pscore1.2, prop2[which(prop2$democracy_1 == 0),]$dirdyadid)
+
+#We then include the oil and gas value as an explanatory variable in the universe of cases for that are nondemocratic to see whether oil makes initiation of a MID more likely for autocracies. This is using the parsimonious model. 
+pscore2.1 <- glm(mzinit ~ oil_gas_valuePOP_2014 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=prop[which(prop$democracy_1 == 0),], family="binomial")
+sepscore2.1 <- robust.se(pscore2.1, prop[which(prop$democracy_1 == 0),]$dirdyadid)
+
+#We then do the same for the full model. 
+pscore2.2 <- glm(mzinit ~ oil_gas_valuePOP_2014 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=prop2[which(prop2$democracy_1 == 0),], family="binomial")
+sepscore2.2 <- robust.se(pscore2.2, prop2[which(prop2$democracy_1 == 0),]$dirdyadid)
+
+#Next, we include oil and gas value as a covariate in Weeks's parsimonious model (including her regime variables) in the full universe of cases (democracies and nondemocracies)
+pscore3.1 <- glm(mzinit ~ oil_gas_valuePOP_2014 + machinejlw_1 +juntajlw_1 + bossjlw_1 + strongmanjlw_1 + allotherauts_1 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=prop, family="binomial")
+sepscore3.1 <- robust.se(pscore3.1, prop$dirdyadid)
+
+#We then do the same for the parsimonious model. 
+pscore3.2 <- glm(mzinit ~ oil_gas_valuePOP_2014 + machinejlw_1 + juntajlw_1 + bossjlw_1 + strongmanjlw_1 + allotherauts_1 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=prop2, family="binomial")
+sepscore3.2 <- robust.se(pscore3.2, prop2$dirdyadid)
+```
+
+```{R, cache = TRUE}
+#We then create a dataset merging the media dataset and the dataset that merges the Weeks dataset to the Ross and Mahdavi dataset. 
+propensity2 <- merge(media, propensity, by.x=c("ccode", "year"), by.y=c("ccode1", "year"))
+
+#We create a dataframe dropping observations for which the values are missing for variables used in the parsimonious model.  
+prop3 <- propensity2[which(
+    is.na(propensity2$mzinit) != 1 &
+    is.na(propensity2$machinejlw_1) != 1 &
+    is.na(propensity2$juntajlw_1) != 1 &
+    is.na(propensity2$bossjlw_1) != 1 &
+    is.na(propensity2$strongmanjlw_1) != 1 &
+    is.na(propensity2$allotherauts_1) != 1 &
+    is.na(propensity2$democracy_1) !=1 &
+    is.na(propensity2$cap_1) != 1 &
+    is.na(propensity2$cap_2) != 1 &
+    is.na(propensity2$majmaj) != 1 &
+    is.na(propensity2$minmaj) != 1 &
+    is.na(propensity2$majmin) != 1 &
+    is.na(propensity2$pcyrsmzinit) != 1 &
+    is.na(propensity2$pcyrsmzinits1) != 1 &
+    is.na(propensity2$pcyrsmzinits2) != 1 &
+    is.na(propensity2$pcyrsmzinits3) != 1 &
+    is.na(propensity2$dyadid) != 1 &
+    is.na(propensity2$dirdyadid) != 1 & 
+    is.na(propensity2$mediascore) !=1 &
+    is.na(propensity2$oil_gas_valuePOP_2014) != 1 &
+    propensity2$democracy_1 != "."), 
+  c("mzinit",
+    "machinejlw_1",
+    "juntajlw_1",
+    "bossjlw_1",
+    "strongmanjlw_1",
+    "allotherauts_1",
+    "newregime_1",
+    "democracy_1",
+    "democracy_2",
+    "cap_1",
+    "cap_2",
+    "initshare",
+    "dependlow",
+    "majmaj",
+    "minmaj",
+    "majmin",
+    "contigdum",
+    "logdist",
+    "s_wt_glo",
+    "s_lead_1",
+    "s_lead_2",
+    "pcyrsmzinit",
+    "pcyrsmzinits1",
+    "pcyrsmzinits2",
+    "pcyrsmzinits3",
+    "dirdyadid",
+    "dyadid",
+    "year",
+    "oil_gas_valuePOP_2014",
+    "mediascore")]
+
+#We then do the same for the full model. 
+prop4 <- propensity2[which(
+    is.na(propensity2$mzinit) != 1 &
+    is.na(propensity2$machinejlw_1) != 1 &
+    is.na(propensity2$juntajlw_1) != 1 &
+    is.na(propensity2$bossjlw_1) != 1 &
+    is.na(propensity2$strongmanjlw_1) != 1 &
+    is.na(propensity2$allotherauts_1) != 1 &
+    is.na(propensity2$newregime_1) !=1 &
+    is.na(propensity2$democracy_2) !=1 &
+    is.na(propensity2$cap_1) != 1 &
+    is.na(propensity2$cap_2) != 1 &
+    is.na(propensity2$initshare) !=1 &
+    is.na(propensity2$dependlow) !=1 &
+    is.na(propensity2$majmaj) != 1 &
+    is.na(propensity2$minmaj) != 1 &
+    is.na(propensity2$majmin) != 1 &
+    is.na(propensity2$contigdum) != 1 &
+    is.na(propensity2$logdist) != 1 &
+    is.na(propensity2$s_wt_glo) !=1 &
+    is.na(propensity2$s_lead_1) !=1 &
+    is.na(propensity2$s_lead_2) !=1 &
+    is.na(propensity2$pcyrsmzinit) != 1 &
+    is.na(propensity2$pcyrsmzinits1) != 1 &
+    is.na(propensity2$pcyrsmzinits2) != 1 &
+    is.na(propensity2$pcyrsmzinits3) != 1 &
+    is.na(propensity2$dyadid) != 1 &
+    is.na(propensity2$dirdyadid) != 1 & 
+    is.na(propensity2$mediascore) !=1 &
+    is.na(propensity2$oil_gas_valuePOP_2014) != 1 &
+    propensity2$democracy_1 != "."), 
+  c("mzinit",
+    "machinejlw_1",
+    "juntajlw_1",
+    "bossjlw_1",
+    "strongmanjlw_1",
+    "allotherauts_1",
+    "newregime_1",
+    "democracy_1",
+    "democracy_2",
+    "cap_1",
+    "cap_2",
+    "initshare",
+    "dependlow",
+    "majmaj",
+    "minmaj",
+    "majmin",
+    "contigdum",
+    "logdist",
+    "s_wt_glo",
+    "s_lead_1",
+    "s_lead_2",
+    "pcyrsmzinit",
+    "pcyrsmzinits1",
+    "pcyrsmzinits2",
+    "pcyrsmzinits3",
+    "dirdyadid",
+    "dyadid",
+    "year",
+    "oil_gas_valuePOP_2014",
+    "mediascore")]
+
+#In the parsimonious model, we use mediascore as the outcome and oil and natural gas wealth as the explanatory variable. 
+pscore3.3 <- lm(mediascore ~ oil_gas_valuePOP_2014 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=prop3[which(prop3$democracy_1 == 0 & prop3$mediascore < 8 & prop3$mediascore > 0),])
+sepscore3.3 <- robust.se(pscore3.3, prop3[which(prop3$democracy_1 == 0 & prop3$mediascore < 8 & prop3$mediascore > 0),]$dirdyadid)
+
+#We then do the same for the full model. 
+pscore3.4 <- lm(mediascore ~ oil_gas_valuePOP_2014 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=prop4[which(prop4$democracy_1 == 0  & prop4$mediascore < 8 & prop4$mediascore > 0),])
+sepscore3.4 <- robust.se(pscore3.4, prop4[which(prop4$democracy_1 == 0 & prop4$mediascore < 8 & prop4$mediascore > 0),]$dirdyadid)
+
+#Next, we use include oil and natural gas wealth in Weeks's parsimonious model (including all regime types)
+pscore3.5 <- lm(mediascore ~ oil_gas_valuePOP_2014 + machinejlw_1 +juntajlw_1 + bossjlw_1 + strongmanjlw_1 + allotherauts_1 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=prop3[which(prop3$democracy_1 == 0),])
+sepscore3.5 <- robust.se(pscore3.5, prop3[which(prop3$democracy_1 == 0),]$dirdyadid)
+
+#We then do the same for the full model. 
+pscore3.6 <- lm(mediascore ~ oil_gas_valuePOP_2014 + machinejlw_1 +juntajlw_1 + bossjlw_1 + strongmanjlw_1 + allotherauts_1 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=prop4[which(prop4$democracy_1 == 0),])
+sepscore3.6 <- robust.se(pscore3.6, prop4[which(prop4$democracy_1 == 0),]$dirdyadid)
+
+#Next, we use mzinit as an outcome, mediascore as the explanatory variable, and oil and gas wealth as a covariate to go along with the covariates of Weeks's parsimonious model. 
+pscore3.7 <- glm(mzinit ~ mediascore + oil_gas_valuePOP_2014 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=prop3[which(prop3$democracy_1 == 0 & prop3$mediascore < 8 & prop3$mediascore > 0),], family="binomial")
+sepscore3.7 <- robust.se(pscore3.7, prop3[which(prop3$democracy_1 == 0 & prop3$mediascore < 8 & prop3$mediascore > 0),]$dirdyadid)
+
+#We then do the same for the full model. 
+pscore3.8 <- glm(mzinit ~ mediascore + oil_gas_valuePOP_2014 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=prop4[which(prop4$democracy_1 == 0 & prop4$mediascore < 8 & prop4$mediascore > 0),], family="binomial")
+sepscore3.8 <- robust.se(pscore3.8, prop4[which(prop4$democracy_1 == 0 & prop4$mediascore < 8 & prop4$mediascore > 0),]$dirdyadid)
+
+#We repeat this procedure on the parismonious model, using OLS for ease of interpretation. 
+pscore3.9 <- lm(mzinit ~ mediascore + oil_gas_valuePOP_2014 + cap_1 + cap_2 + majmaj + minmaj + majmin + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=prop3[which(prop3$democracy_1 == 0 & prop3$mediascore < 8 & prop3$mediascore > 0),])
+sepscore3.9 <- robust.se(pscore3.9, prop3[which(prop3$democracy_1 == 0 & prop3$mediascore < 8 & prop3$mediascore > 0),]$dirdyadid)
+
+#We do the same using the covariates of hte full model. 
+pscore3.10 <- lm(mzinit ~ mediascore + oil_gas_valuePOP_2014 + newregime_1 + democracy_2 + cap_1 + cap_2 + initshare +  dependlow +  majmaj + minmaj + majmin + contigdum +  logdist + s_wt_glo +  s_lead_1 + s_lead_2 + pcyrsmzinit + pcyrsmzinits1 + pcyrsmzinits2 + pcyrsmzinits3, data=prop4[which(prop4$democracy_1 == 0 & prop4$mediascore < 8 & prop4$mediascore > 0),])
+sepscore3.10 <- robust.se(pscore3.8, prop4[which(prop4$democracy_1 == 0 & prop4$mediascore < 8 & prop4$mediascore > 0),]$dirdyadid)
+```
+
+
+```{R}
+sessionInfo
+```
+
+

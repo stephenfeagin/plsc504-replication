@@ -1,0 +1,34 @@
+# Output PDFs
+*.pdf
+
+# Dot files not related to git
+.*
+!.git*
+
+# LaTeX auxiliary files
+*.aux
+*.out
+*.log
+*.lof
+*.lot
+*.fls
+*.toc
+*.fmt
+*.fot
+*.cb
+*.cb2
+*.fdb_latexmk
+*.synctex*
+*.pdfsync
+
+# Emacs backups:
+*.*~
+
+# Emacs autosaves:
+\#*
+
+# Initial drafts directory
+Analysis\ Drafts
+
+# Uncompressed Data directory
+Data/

@@ -1,6 +1,6 @@
-Title: README: Term Paper
-Authors: Stephen Feagin, Nate Grubman, Stephen Herzog
-Date: December 18, 2015
+# README
+## Authors: Stephen Feagin, Nate Grubman, Stephen Herzog
+## Date: December 18, 2015
 
 This repository contains source code for a replication of Jessica Weeks (2012),
 "Strongmen and Straw Men: Authoritarian Regimes and the Initiation of 
